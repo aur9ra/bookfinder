@@ -1,0 +1,7 @@
+.env
+__pycache__
+venv
+PLAN.md
+*\.html
+*\.csv
+*\.txt
