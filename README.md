@@ -26,6 +26,7 @@ ideally, this software gets more people to go to their libraries! support your p
 **setup and run**:
 
 linux/macOS:
+
 ```bash
 # create and activate virtual environment
 python3 -m venv venv
@@ -39,6 +40,7 @@ python3 main.py
 ```
 
 windows:
+
 ```pwsh
 # create and activate virtual environment
 python -m venv venv
@@ -57,6 +59,8 @@ python main.py
 - **survey**: you answer 3-5 questions to clarify your preferences
 - **search**: the agent performs a "wide net" search of 15 books' availability at your local SFPL branch(es)
 - **feedback**: critique the results until you find a few books you like
+
+`search_session.json` will be created in the root directory to cache your preferences. delete this file if you wish to start a completely fresh session.
 
 ## todo
 

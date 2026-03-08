@@ -112,8 +112,8 @@ class FinalRecommendation(BaseModel):
     reasoning: str = Field(description="Why this book was chosen")
 
 class InterpretationResult(BaseModel):
-    is_complete: bool = Field(description="True if 3 recommendations found")
-    recommendations: List[FinalRecommendation] = Field(default_factory=list, description="Top 3 matches")
+    is_complete: bool = Field(description="True if 5 recommendations found")
+    recommendations: List[FinalRecommendation] = Field(default_factory=list, description="Top 5 matches")
     reasoning: str = Field(description="Overall interpretation logic")
 
 # --- orchestration / session models ---
