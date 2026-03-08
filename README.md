@@ -24,13 +24,32 @@ ideally, this software gets more people to go to their libraries! support your p
 - configure `user_settings.json` with your preferred library branch codes (e.g., `["G4", "E9"]`).
 
 **setup and run**:
-    ```bash
-    # Install dependencies
-    pip install -r requirements.txt
 
-    # Start
-    python main.py
-    ```
+linux/macOS:
+```bash
+# create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# install dependencies
+pip install -r requirements.txt
+
+# start
+python3 main.py
+```
+
+windows:
+```pwsh
+# create and activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate
+
+# install dependencies
+pip install -r requirements.txt
+
+# start
+python main.py
+```
 
 **workflow**:
 
