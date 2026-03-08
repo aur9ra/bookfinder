@@ -9,7 +9,7 @@ class LibraryService:
         self.locations = locations
         self.branch_lookup = branch_lookup
 
-    async def search_book(self, book: BookToSearch) -> bool:
+    async def search_book(self, book: BookToSearch, status_callback=None) -> bool:
         """
         Performs a location-first, then wide-net search for a book.
         Updates the book object in-place. Returns True if results were found.
@@ -17,15 +17,16 @@ class LibraryService:
         queries = [book.primary_query] + book.fallback_queries
         
         for q in queries:
+            if status_callback:
+                status_callback("local")
             # search with location filters first.
-            # why?
-            # when including location filters, we see if books are available at those locations,
-            # but do not get information for holds
             result_set: SearchResultSet = await search_sfpl(q, self.locations, search_type="smart")
             
             is_available = any(r.status.lower() == 'available' for r in result_set.results)
             
             if not is_available:
+                if status_callback:
+                    status_callback("wide")
                 # if the book is not found available at the user-specified locations,
                 # search without location to see if any are available to place a hold on at other locations
                 result_set = await search_sfpl(q, [], search_type="smart")

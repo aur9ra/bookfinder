@@ -25,7 +25,8 @@ async def wide_net_selection(analysis: RefinedReaderAnalysis, to_read: str, rate
     wide_net_agent = Agent(
         model=model,
         system_prompt=PROMPTS["wide_net_selection"],
-        structured_output_model=BookSearchPlan
+        structured_output_model=BookSearchPlan,
+        callback_handler=None
     )
 
     selection_result = await wide_net_agent.invoke_async(
@@ -43,7 +44,8 @@ async def targeted_expansion_selection(analysis: RefinedReaderAnalysis, previous
     expansion_agent = Agent(
         model=model,
         system_prompt=PROMPTS["targeted_expansion_selection"].format(previous_titles=previous_titles),
-        structured_output_model=TargetedExpansionPlan
+        structured_output_model=TargetedExpansionPlan,
+        callback_handler=None
     )
 
     expansion_result = await expansion_agent.invoke_async(
@@ -60,7 +62,8 @@ async def interpret_search_results(analysis: RefinedReaderAnalysis, all_searched
     interpretation_agent = Agent(
         model=model,
         system_prompt=PROMPTS["interpret_search_results"],
-        structured_output_model=InterpretationResult
+        structured_output_model=InterpretationResult,
+        callback_handler=None
     )
 
     interpretation_result = await interpretation_agent.invoke_async(
@@ -71,18 +74,21 @@ async def interpret_search_results(analysis: RefinedReaderAnalysis, all_searched
     
     return interpretation_result.structured_output
 
-async def preference_determination(analysis, rated, to_read, model) -> PreferenceDeterminationPlan:
+async def preference_determination(analysis: ReaderAnalysis, rated: str, to_read: str, model, previous_analysis: RefinedReaderAnalysis = None) -> PreferenceDeterminationPlan:
     # questions to determine reader preferences
     preferences_questions_agent = Agent(
         model=model,
         system_prompt=PROMPTS["preference_determination"],
-        structured_output_model=PreferenceDeterminationPlan
+        structured_output_model=PreferenceDeterminationPlan,
+        callback_handler=None
     )
 
-    preferences_questions_result = await preferences_questions_agent.invoke_async(
-        f"Reader Profile: {analysis.model_dump_json()}\n"
-        f"Book History: {rated}"
-    )
+    context = f"Initial Profile: {analysis.model_dump_json()}\n"
+    if previous_analysis:
+        context += f"Previous Refined Profile (Incomplete): {previous_analysis.model_dump_json()}\n"
+    context += f"Book History: {rated}"
+
+    preferences_questions_result = await preferences_questions_agent.invoke_async(context)
     plan: PreferenceDeterminationPlan = preferences_questions_result.structured_output
 
     return plan
@@ -92,7 +98,8 @@ async def analyze_reader(rated, to_read, model) -> ReaderAnalysis:
     discovery_agent = Agent(
         model=model,
         system_prompt=PROMPTS["analyze_reader"],
-        structured_output_model=ReaderAnalysis
+        structured_output_model=ReaderAnalysis,
+        callback_handler=None
     )
 
     discovery_result = await discovery_agent.invoke_async(
@@ -110,7 +117,8 @@ async def refine_analysis(previous_analysis: ReaderAnalysis, plan: PreferenceDet
     refinement_agent = Agent(
         model=model,
         system_prompt=PROMPTS["refine_analysis"],
-        structured_output_model=RefinedReaderAnalysis
+        structured_output_model=RefinedReaderAnalysis,
+        callback_handler=None
     )
 
     refinement_result = await refinement_agent.invoke_async(

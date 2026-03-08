@@ -28,7 +28,7 @@ async def get_detailed_availability(metadata_id: str) -> List[str]:
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
         try:
             response = await client.get(availability_query_url, params=query_params)
-            print(f"    [Availability API] {response.status_code} {availability_query_url}")
+            # print(f"    [Availability API] {response.status_code} {availability_query_url}")
             if response.status_code != 200:
                 return []
             
@@ -44,10 +44,10 @@ async def get_detailed_availability(metadata_id: str) -> List[str]:
             
             return list(set(available_branches))
         except httpx.ReadTimeout:
-            print(f"    [Availability API] Timeout for {metadata_id}, retrying...")
+            # print(f"    [Availability API] Timeout for {metadata_id}, retrying...")
             raise
         except Exception as e:
-            print(f"    [Availability API] Error for {metadata_id}: {e}")
+            # print(f"    [Availability API] Error for {metadata_id}: {e}")
             return []
 
 @retry(
@@ -74,16 +74,16 @@ async def search_sfpl(search, locations: List, search_type="title") -> SearchRes
     if location_query:
         params["f_STATUS"] = location_query
 
-    print(f"Searching SFPL for: {search}...")
+    # print(f"Searching SFPL for: {search}...")
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
         try:
             response = await client.get(request_uri, params=params)
-            print(f"    [Search API] {response.status_code} {response.url}")
+            # print(f"    [Search API] {response.status_code} {response.url}")
             response.raise_for_status()
             html = response.text
         except httpx.ReadTimeout:
-            print(f"    [Search API] Timeout for {search}, retrying...")
+            # print(f"    [Search API] Timeout for {search}, retrying...")
             raise
 
     soup = BeautifulSoup(html, "html.parser")

@@ -59,9 +59,9 @@ class BookToSearch(BaseModel):
     source: Literal["to_read", "discovery"] = Field(description="Source of the book")
     primary_query: str = Field(description="Primary search string")
     fallback_queries: List[str] = Field(default_factory=list, description="Fallback queries")
-    results: List[RawSearchResult] = Field(default_factory=list, description="Raw results found")
-    search_url: Optional[str] = Field(default=None, description="Successful search URL")
-    searched: bool = Field(default=False, description="Whether this book has been searched")
+    results: List[RawSearchResult] = Field(default_factory=list, description="Raw results found", exclude=True)
+    search_url: Optional[str] = Field(default=None, description="Successful search URL", exclude=True)
+    searched: bool = Field(default=False, description="Whether this book has been searched", exclude=True)
 
 class BookSearchPlan(BaseModel):
     b1: BookToSearch

@@ -35,23 +35,15 @@ def get_model():
     )
 
 async def run_search_workflow(plan, service: LibraryService, session: SearchSession, dm: DataManager):
+    books = plan.get_books()
     BookfinderCLI.display_search_header("LIBRARY SEARCH STATUS")
     
-    for book in plan.get_books():
-        # skip if already searched in this session (though with clean slate search results it might not matter,
-        # but for session caching we might want to keep the results if we saved them)
-        if book.searched and book.results:
-            BookfinderCLI.display_book_results(book, service)
-            continue
-
-        book.results = []
-        book.search_url = None
-        
-        await service.search_book(book)
-        BookfinderCLI.display_book_results(book, service)
-        
-        # save after each search to avoid data loss
-        dm.save("search_session.json", session)
+    await BookfinderCLI.run_search_with_progress(
+        books=books,
+        search_func=service.search_book,
+        service=service,
+        on_step_complete=lambda: dm.save("search_session.json", session)
+    )
 
 # initialize environment
 load_dotenv()
@@ -104,7 +96,6 @@ async def main():
 
     # step 3. perform initial preference analysis, determine questions to get clearer picture
     if not session.reader_profile or not session.questions_plan:
-        print("Running initial analysis and question generation...")
         model = get_model()
         session.reader_profile = await analyze_reader(rated_str, to_read_str, model)
         session.questions_plan = await preference_determination(session.reader_profile, rated_str, to_read_str, model)
@@ -117,7 +108,6 @@ async def main():
 
     # step 5. refine with user responses
     if not session.refined_profile:
-        print("Refining reader analysis...")
         session.refined_profile = await refine_analysis(session.reader_profile, session.questions_plan, session.user_responses, get_model())
         dm.save("search_session.json", session)
 
@@ -126,7 +116,6 @@ async def main():
     # step 6. search until we have a number of solid reccomendations
     if session.refined_profile.is_complete:
         if not session.wide_net_plan:
-            print("\nGenerating wide net search plan (15 books)...")
             session.wide_net_plan = await wide_net_selection(session.refined_profile, to_read_str, rated_str, get_model())
             dm.save("search_session.json", session)
 
