@@ -10,9 +10,10 @@ i made up a bro in my mind who thinks we should replace librarians with the LLM
 
 i thought about how one would do this, and made bookfinder over a weekend.
 
-librarians do amazing work though, and they're good at it! however, this problem is sort-of well suited to an LLM.
+librarians do amazing work, and they're good at it! however, this problem is decently well suited to an LLM.
+
 LLMs have been trained on every published novel as well as much of our discussion around these novels.
-you can also throw your entire goodreads history at an LLM, as well, and it will do a decent job at identifying the patterns in your ratings.
+you can also throw your entire goodreads history at an LLM, and it will do a decent job at identifying the patterns in your ratings.
 
 ideally, this software gets more people to go to their libraries! support your public services!
 
@@ -27,7 +28,7 @@ ideally, this software gets more people to go to their libraries! support your p
     # Install dependencies
     pip install -r requirements.txt
 
-    # Start the search
+    # Start
     python main.py
     ```
 
@@ -40,6 +41,6 @@ ideally, this software gets more people to go to their libraries! support your p
 
 ## todo
 
-- [] provide support for searching for books in other languages or translations
-- [] implement more cities' public library systems
-- [] implement support for LLM providers with better privacy
+- [ ] provide support for searching for books in other languages or translations
+- [ ] implement more cities' public library systems
+- [ ] implement support for LLM providers with better privacy
