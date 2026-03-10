@@ -135,7 +135,8 @@ async def search_sfpl(search, locations: List, search_type="title") -> SearchRes
             results.append(RawSearchResult(
                 title=title_tag.get_text(strip=True),
                 author=author_tag.get_text(strip=True) if author_tag else "Unknown",
-                status=status_tag.get_text(strip=True) if status_tag else "Availability Unknown",
+                status_label=status_tag.get_text(strip=True) if status_tag else "Availability Unknown",
+                availability="Not Available", # Default, will be refined in service
                 metadata_id=metadata_id,
                 holds=holds,
                 copies=copies,

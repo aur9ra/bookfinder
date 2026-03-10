@@ -38,12 +38,21 @@ class UserAnswer(BaseModel):
 class UserResponseSet(BaseModel):
     answers: List[UserAnswer] = Field(description="Set of answers provided by the user")
 
+from enum import Enum
+
 # --- library & search models ---
+
+class AvailabilityStatus(str, Enum):
+    AVAILABLE_LOCAL = "Available Local"
+    AVAILABLE_SYSTEM = "Available in System"
+    ON_HOLD = "On Hold"
+    NOT_AVAILABLE = "Not Available"
 
 class RawSearchResult(BaseModel):
     title: str
     author: str
-    status: str
+    status_label: str = Field(description="Original status text from library")
+    availability: AvailabilityStatus = Field(default=AvailabilityStatus.NOT_AVAILABLE)
     metadata_id: str = Field(default="", description="The unique ID used for availability lookups")
     holds: int = Field(default=0, description="Number of people waiting")
     copies: int = Field(default=0, description="Total number of physical copies")
@@ -54,6 +63,7 @@ class SearchResultSet(BaseModel):
     url: str = Field(description="The URL used to perform this search")
 
 class BookToSearch(BaseModel):
+    search_id: str = Field(description="A unique, URL-friendly identifier (slug) for this book, e.g., 'hitchhikers-guide-to-the-galaxy'")
     title: str = Field(description="Title of the book")
     author: str = Field(description="Author of the book")
     source: Literal["to_read", "discovery"] = Field(description="Source of the book")
@@ -105,10 +115,9 @@ class UserFeedback(BaseModel):
     rejected_titles: List[str] = Field(default_factory=list, description="Titles the user specifically rejected in this turn")
 
 class FinalRecommendation(BaseModel):
+    search_id: str = Field(description="The search_id of the BookToSearch this recommendation is based on")
     title: str
     author: str
-    source_book: str = Field(description="Original search title")
-    availability_status: str = Field(description="Library status")
     reasoning: str = Field(description="Why this book was chosen")
 
 class InterpretationResult(BaseModel):

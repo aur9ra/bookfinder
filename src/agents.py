@@ -1,4 +1,4 @@
-import json
+import json, asyncio
 from typing import List
 from strands.models.gemini import GeminiModel
 from strands.agent.agent import Agent
@@ -88,8 +88,19 @@ async def preference_determination(analysis: ReaderAnalysis, rated: str, to_read
         context += f"Previous Refined Profile (Incomplete): {previous_analysis.model_dump_json()}\n"
     context += f"Book History: {rated}"
 
-    preferences_questions_result = await preferences_questions_agent.invoke_async(context)
-    plan: PreferenceDeterminationPlan = preferences_questions_result.structured_output
+    try:
+        preferences_questions_result = await asyncio.wait_for(
+            preferences_questions_agent.invoke_async(context),
+            timeout=60.0
+        )
+        plan: PreferenceDeterminationPlan = preferences_questions_result.structured_output
+    except asyncio.TimeoutError:
+        # Fallback if the model is being slow/unresponsive
+        print("\n[DEBUG] Question generation timed out. Retrying with simpler context...")
+        preferences_questions_result = await preferences_questions_agent.invoke_async(
+            f"Initial Profile: {analysis.model_dump_json()}\nBook History: {rated}"
+        )
+        plan = preferences_questions_result.structured_output
 
     return plan
 

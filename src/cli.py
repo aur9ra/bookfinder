@@ -1,15 +1,15 @@
+import difflib
 from typing import List, Dict, Callable, Any, Coroutine
 from models import (
     PreferenceDeterminationPlan, UserResponseSet, UserAnswer, SearchSession, 
-    BookToSearch, RefinedReaderAnalysis, UserFeedback
+    BookToSearch, RefinedReaderAnalysis, UserFeedback, AvailabilityStatus
 )
 from library_service import LibraryService
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
 from rich.text import Text
-
-console = Console()
+from rich.prompt import Prompt
 
 class CLITheme:
     HEADER = "bold deep_sky_blue1"
@@ -22,27 +22,38 @@ class CLITheme:
     SUCCESS = "green"
     ERROR = "bold red"
     ACCENT = "italic orange1"
+    
+    # Availability Colors
+    AVAIL_LOCAL = "bold green1"
+    AVAIL_SYSTEM = "orange3"
+    AVAIL_HOLD = "red3"
 
 class BookfinderCLI:
+    console = Console(force_terminal=True)
+
     @staticmethod
     def get_user_satisfaction() -> bool:
         while True:
-            console.print(f"\nAre you satisfied with these recommendations? (y/n): ", end="", style=CLITheme.SUBHEADER)
-            val = input().strip().lower()
+            val = Prompt.ask(
+                Text("\nAre you satisfied with these recommendations?", style=CLITheme.SUBHEADER),
+                choices=["y", "n"],
+                default="y"
+            ).lower()
             if val in ('y', 'yes'):
                 return True
             if val in ('n', 'no'):
                 return False
-            console.print("Please enter 'y' or 'n'.", style=CLITheme.ERROR)
 
     @staticmethod
     def get_refinement_input() -> UserFeedback:
         BookfinderCLI.display_search_header("REFINEMENT FEEDBACK")
-        console.print("What would you like to change? (e.g., 'too dark', 'more non-fiction'): ", end="", style=CLITheme.SUBHEADER)
-        feedback_text = input().strip()
+        feedback_text = Prompt.ask(
+            Text("What would you like to change? (e.g., 'too dark', 'already read X', 'more non-fiction')", style=CLITheme.SUBHEADER)
+        ).strip()
         
-        console.print("Any specific titles to blacklist? (comma-separated, or leave blank): ", end="", style=CLITheme.SUBHEADER)
-        rejected_input = input().strip()
+        rejected_input = Prompt.ask(
+            Text("Any specific titles to blacklist? (comma-separated, or leave blank)", style=CLITheme.SUBHEADER)
+        ).strip()
         rejected_titles = [t.strip() for t in rejected_input.split(',')] if rejected_input else []
         
         return UserFeedback(feedback=feedback_text, rejected_titles=rejected_titles)
@@ -51,27 +62,25 @@ class BookfinderCLI:
     def ask_questions(plan: PreferenceDeterminationPlan) -> UserResponseSet:
         answers = []
         BookfinderCLI.display_search_header("READER PREFERENCE SURVEY")
-        console.print("Please answer the following questions to help refine your profile.\n", style=CLITheme.DIM)
+        BookfinderCLI.console.print("Please answer the following questions to help refine your profile.\n", style=CLITheme.DIM)
 
         for i, question in enumerate(plan.questions, 1):
-            console.print(f"Question {i}: {question.text}", style=CLITheme.SUBHEADER)
+            BookfinderCLI.console.print(f"Question {i}: {question.text}", style=CLITheme.SUBHEADER)
             
             # display response options
             for j, option in enumerate(question.options, 1):
-                console.print(f"  {j}. {option.label}")
+                BookfinderCLI.console.print(f"  {j}. {option.label}")
             
             custom_idx = len(question.options) + 1
-            console.print(f"  {custom_idx}. Custom, let me explain myself")
-            
-            selected_option_ids = []
-            custom_explanation = None
+            BookfinderCLI.console.print(f"  {custom_idx}. Custom, let me explain myself")
             
             while True:
-                console.print(f"\nSelect options (comma-separated numbers): ", end="", style=CLITheme.ACCENT)
-                user_input = input().strip()
+                user_input = Prompt.ask(
+                    Text("\nSelect options (comma-separated numbers)", style=CLITheme.ACCENT)
+                ).strip()
                 
                 if not user_input:
-                    console.print("Please provide an answer.", style=CLITheme.ERROR)
+                    BookfinderCLI.console.print("Please provide an answer.", style=CLITheme.ERROR)
                     continue
                     
                 try:
@@ -87,29 +96,31 @@ class BookfinderCLI:
                         elif choice == custom_idx:
                             is_custom_selected = True
                         else:
-                            console.print(f"Invalid choice: {choice}", style=CLITheme.ERROR)
+                            BookfinderCLI.console.print(f"Invalid choice: {choice}", style=CLITheme.ERROR)
                             valid = False
                             break
                     
                     if not valid:
                         continue
                     
+                    custom_explanation = None
                     if is_custom_selected:
-                        console.print("Please explain your preference: ", end="", style=CLITheme.ACCENT)
-                        custom_explanation = input().strip()
+                        custom_explanation = Prompt.ask(
+                            Text("Please explain your preference", style=CLITheme.ACCENT)
+                        ).strip()
                     
                     selected_option_ids = current_selected_ids
                     break
                     
                 except ValueError:
-                    console.print("Please enter valid numbers.", style=CLITheme.ERROR)
+                    BookfinderCLI.console.print("Please enter valid numbers.", style=CLITheme.ERROR)
 
             answers.append(UserAnswer(
                 question_id=question.id,
                 selected_option_ids=selected_option_ids,
                 custom_explanation=custom_explanation
             ))
-            console.print("-" * 30, style=CLITheme.DIM)
+            BookfinderCLI.console.print("-" * 30, style=CLITheme.DIM)
 
         return UserResponseSet(answers=answers)
 
@@ -117,21 +128,20 @@ class BookfinderCLI:
     def display_refinement(refined_profile: RefinedReaderAnalysis):
         status = "Complete" if refined_profile.is_complete else "Incomplete"
         color = CLITheme.SUCCESS if refined_profile.is_complete else CLITheme.NOT_FOUND
-        console.print(f"\nRefinement Status: [{color}]{status}[/]")
-        console.print(f"Reasoning: ", end="", style=CLITheme.DIM)
-        console.print(refined_profile.refinement_reasoning)
+        BookfinderCLI.console.print(f"\nRefinement Status: [{color}]{status}[/]")
+        BookfinderCLI.console.print(f"[{CLITheme.DIM}]Reasoning:[/] {refined_profile.refinement_reasoning}")
         
         if refined_profile.diversification_goals:
-            console.print("\nDiversification Goals:", style=CLITheme.SUBHEADER)
+            BookfinderCLI.console.print("\nDiversification Goals:", style=CLITheme.SUBHEADER)
             for goal in refined_profile.diversification_goals:
-                console.print(f"  - {goal}", style=CLITheme.ACCENT)
+                BookfinderCLI.console.print(f"  - {goal}", style=CLITheme.ACCENT)
 
     @staticmethod
     def display_search_header(title: str):
         width = 80
-        console.print("\n" + "="*width, style=CLITheme.HEADER)
-        console.print(title.center(width), style=CLITheme.HEADER)
-        console.print("="*width, style=CLITheme.HEADER)
+        BookfinderCLI.console.print("\n" + "="*width, style=CLITheme.HEADER)
+        BookfinderCLI.console.print(title.center(width), style=CLITheme.HEADER)
+        BookfinderCLI.console.print("="*width, style=CLITheme.HEADER)
 
     @staticmethod
     async def run_search_with_progress(
@@ -140,9 +150,10 @@ class BookfinderCLI:
         service: LibraryService,
         on_step_complete: Callable[[], None]
     ):
+        from models import AvailabilityStatus
         book_statuses = {b.title: f"[{CLITheme.QUEUED}][QUEUED][/]" for b in books}
         book_progress_labels = {b.title: "queued..." for b in books}
-        book_results_summary = {b.title: "" for b in books}
+        book_results_summary = {b.title: Text() for b in books}
 
         def generate_table():
             table = Table(box=None, show_header=False, pad_edge=False)
@@ -157,7 +168,8 @@ class BookfinderCLI:
                 
                 summary = book_results_summary[b.title]
                 if summary:
-                    text.append(f"\n    {summary}", style=CLITheme.DIM)
+                    text.append("\n    ")
+                    text.append(summary)
                 else:
                     progress_label = book_progress_labels[b.title]
                     text.append(f"\n    {progress_label}", style=CLITheme.DIM)
@@ -165,8 +177,8 @@ class BookfinderCLI:
                 table.add_row(status, text)
             return table
 
-        console.print("\nStarting library searches...", style=CLITheme.SUBHEADER)
-        with Live(generate_table(), refresh_per_second=4) as live:
+        BookfinderCLI.console.print("\nStarting library searches...", style=CLITheme.SUBHEADER)
+        with Live(generate_table(), refresh_per_second=4, console=BookfinderCLI.console) as live:
             for book in books:
                 book_statuses[book.title] = f"[{CLITheme.SEARCHING}][SEARCHING][/]"
                 
@@ -184,10 +196,17 @@ class BookfinderCLI:
                 
                 if book.results:
                     book_statuses[book.title] = f"[{CLITheme.FOUND}][FOUND][/]"
-                    summary = service.get_status_summary(book.results[0])
+                    top_res = book.results[0]
+                    color = CLITheme.AVAIL_HOLD
+                    if top_res.availability == AvailabilityStatus.AVAILABLE_LOCAL:
+                        color = CLITheme.AVAIL_LOCAL
+                    elif top_res.availability == AvailabilityStatus.AVAILABLE_SYSTEM:
+                        color = CLITheme.AVAIL_SYSTEM
+                    
+                    summary_text = Text(service.get_status_summary(top_res), style=color)
                     if len(book.results) > 1:
-                        summary += f" (+{len(book.results)-1} more)"
-                    book_results_summary[book.title] = summary
+                        summary_text.append(f" (+{len(book.results)-1} more)", style=CLITheme.DIM)
+                    book_results_summary[book.title] = summary_text
                 else:
                     book_statuses[book.title] = f"[{CLITheme.NOT_FOUND}][NOT FOUND][/]"
                     book_progress_labels[book.title] = "not found"
@@ -197,47 +216,89 @@ class BookfinderCLI:
 
     @staticmethod
     def display_book_results(book: BookToSearch, service: LibraryService):
-        console.print(f"\n--- Searching for: {book.title} by {book.author} ({book.source}) ---", style=CLITheme.SUBHEADER)
+        BookfinderCLI.console.print(f"\n--- Searching for: {book.title} by {book.author} ({book.source}) ---", style=CLITheme.SUBHEADER)
         
         if book.results:
             for r in book.results:
-                console.print(f"    [{service.get_status_summary(r)}] {r.title} by {r.author}")
+                BookfinderCLI.console.print(f"    [{service.get_status_summary(r)}] {r.title} by {r.author}")
             if book.search_url:
-                console.print(f"    Search URL: {book.search_url}", style=CLITheme.DIM)
+                BookfinderCLI.console.print(f"    Search URL: {book.search_url}", style=CLITheme.DIM)
         elif book.searched:
-            console.print("    (No results found in search)", style=CLITheme.DIM)
+            BookfinderCLI.console.print("    (No results found in search)", style=CLITheme.DIM)
 
     @staticmethod
     def display_final_report(session: SearchSession, service: LibraryService):
         if not session.final_recommendations:
             return
 
+        from models import AvailabilityStatus
         BookfinderCLI.display_search_header("FINAL RECOMMENDATIONS")
         
         status = "COMPLETE" if session.final_recommendations.is_complete else "INCOMPLETE"
         color = CLITheme.SUCCESS if session.final_recommendations.is_complete else CLITheme.NOT_FOUND
-        console.print(f"Status: [{color}]{status}[/]")
-        console.print(f"Reasoning: ", end="", style=CLITheme.DIM)
-        console.print(session.final_recommendations.reasoning)
+        BookfinderCLI.console.print(f"Status: [{color}]{status}[/]")
+        BookfinderCLI.console.print(f"[{CLITheme.DIM}]Reasoning:[/] {session.final_recommendations.reasoning}")
         
         if session.final_recommendations.is_complete:
             all_searched = session.wide_net_plan.get_books() if session.wide_net_plan else []
             for p in session.expansion_plans:
                 all_searched.extend(p.get_books())
 
+            def normalize(t):
+                return t.lower().strip() if t else ""
+
+            search_map = {b.search_id: b for b in all_searched if b.search_id}
+            title_map = {normalize(b.title): b for b in all_searched}
+
             for i, rec in enumerate(session.final_recommendations.recommendations, 1):
-                console.print(f"\n{i}. {rec.title} by {rec.author}", style=CLITheme.SUBHEADER)
-                console.print(f"   Original Search: {rec.source_book}", style=CLITheme.DIM)
+                BookfinderCLI.console.print(f"\n{i}. {rec.title} by {rec.author}", style=CLITheme.SUBHEADER)
                 
-                source_match = next((b for b in all_searched if b.title == rec.source_book), None)
+                # 1. try id match first
+                source_match = search_map.get(rec.search_id)
+                
+                # 2. try normalized title match
+                if not source_match:
+                    source_match = title_map.get(normalize(rec.title))
+                
+                # 3. fuzzy match fallback
+                if not source_match:
+                    possible_titles = list(title_map.keys())
+                    closest = difflib.get_close_matches(normalize(rec.title), possible_titles, n=1, cutoff=0.6)
+                    if closest:
+                        source_match = title_map.get(closest[0])
+                
+                found_status = False
+                
                 if source_match:
-                    raw_hit = next((r for r in source_match.results if r.title == rec.title), None)
-                    if raw_hit:
-                        console.print(f"   Status: {service.get_status_summary(raw_hit)}", style=CLITheme.ACCENT)
                     if source_match.search_url:
-                        console.print(f"   Search URL: {source_match.search_url}", style=CLITheme.DIM)
+                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Search:[/] {source_match.search_url}")
+
+                    norm_rec_title = normalize(rec.title)
+                    # find the specific result in the book's search results
+                    raw_hit = next((r for r in source_match.results if normalize(r.title) == norm_rec_title), None)
+                    
+                    if raw_hit:
+                        color = CLITheme.AVAIL_HOLD
+                        if raw_hit.availability == AvailabilityStatus.AVAILABLE_LOCAL:
+                            color = CLITheme.AVAIL_LOCAL
+                        elif raw_hit.availability == AvailabilityStatus.AVAILABLE_SYSTEM:
+                            color = CLITheme.AVAIL_SYSTEM
+                        
+                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status:[/] [{color}]{service.get_status_summary(raw_hit)}[/]")
+                        found_status = True
+                    elif source_match.results:
+                        top_res = source_match.results[0]
+                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status (Top Result):[/] {service.get_status_summary(top_res)}")
+                        found_status = True
                 
-                console.print(f"   Why: ", end="", style=CLITheme.DIM)
-                console.print(rec.reasoning)
+                if not found_status:
+                    # final fallback: manual search link if we couldn't link it to a previous search
+                    import urllib.parse
+                    query = urllib.parse.quote(f"{rec.title} {rec.author}")
+                    manual_link = f"https://sfpl.bibliocommons.com/v2/search?query={query}&searchType=smart"
+                    BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Manual Search:[/] {manual_link}")
+                    BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status:[/] Availability Unknown (Link Mismatch)")
+                
+                BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Why:[/] {rec.reasoning}")
         else:
-            console.print("\nCould not find sufficient high-confidence matches.", style=CLITheme.ERROR)
+            BookfinderCLI.console.print("\nCould not find sufficient high-confidence matches.", style=CLITheme.ERROR)

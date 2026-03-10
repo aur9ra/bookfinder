@@ -1,8 +1,6 @@
 from typing import List, Dict
-from models import BookToSearch, RawSearchResult, SearchResultSet, RefinedReaderAnalysis, TargetedExpansionPlan, InterpretationResult
+from models import BookToSearch, RawSearchResult, SearchResultSet, AvailabilityStatus
 from api import search_sfpl, get_detailed_availability
-from strands.models.gemini import GeminiModel
-from agents import interpret_search_results, targeted_expansion_selection
 
 class LibraryService:
     def __init__(self, locations: List[str], branch_lookup: Dict[str, str]):
@@ -19,16 +17,16 @@ class LibraryService:
         for q in queries:
             if status_callback:
                 status_callback("local")
+            
             # search with location filters first.
             result_set: SearchResultSet = await search_sfpl(q, self.locations, search_type="smart")
             
-            is_available = any(r.status.lower() == 'available' for r in result_set.results)
+            is_available = any(r.status_label.lower() == 'available' for r in result_set.results)
             
             if not is_available:
                 if status_callback:
                     status_callback("wide")
-                # if the book is not found available at the user-specified locations,
-                # search without location to see if any are available to place a hold on at other locations
+                # search without location to see if any are available at other locations
                 result_set = await search_sfpl(q, [], search_type="smart")
 
             if result_set.results:
@@ -36,6 +34,19 @@ class LibraryService:
                 for r in result_set.results:
                     if r.metadata_id:
                         r.branch_codes = await get_detailed_availability(r.metadata_id)
+                    
+                    # Determine Availability Status
+                    is_avail_text = r.status_label.lower() == "available"
+                    has_local = any(c in self.locations for c in r.branch_codes)
+                    
+                    if is_avail_text and has_local:
+                        r.availability = AvailabilityStatus.AVAILABLE_LOCAL
+                    elif is_avail_text:
+                        r.availability = AvailabilityStatus.AVAILABLE_SYSTEM
+                    elif "in use" in r.status_label.lower() or r.holds > 0:
+                        r.availability = AvailabilityStatus.ON_HOLD
+                    else:
+                        r.availability = AvailabilityStatus.NOT_AVAILABLE
                 
                 book.results = result_set.results
                 book.searched = True
@@ -46,9 +57,10 @@ class LibraryService:
 
     def get_status_summary(self, result: RawSearchResult) -> str:
         """Returns a human-readable status string including holds and locations."""
-        status_str = result.status
-        if result.holds > 0:
-            status_str += f" (Holds: {result.holds} on {result.copies} copies)"
+        if result.availability == AvailabilityStatus.ON_HOLD:
+            status_str = f"All copies in use (Holds: {result.holds} on {result.copies} copies)"
+        else:
+            status_str = result.status_label
         
         # add the branches where the book is available, if possible
         if result.branch_codes:
