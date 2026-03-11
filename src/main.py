@@ -34,7 +34,7 @@ def get_model():
         }
     )
 
-async def run_search_workflow(plan, service: LibraryService, session: SearchSession, dm: DataManager):
+async def run_search_workflow(plan, service: LibraryService, session: SearchSession):
     books = plan.get_books()
     BookfinderCLI.display_search_header("LIBRARY SEARCH STATUS")
     
@@ -42,7 +42,7 @@ async def run_search_workflow(plan, service: LibraryService, session: SearchSess
         books=books,
         search_func=service.search_book,
         service=service,
-        on_step_complete=lambda: dm.save("search_session.json", session)
+        on_step_complete=lambda: None # we do not cache sfpl results
     )
 
 # initialize environment
@@ -102,21 +102,27 @@ async def main():
         if not session.reader_profile:
             with BookfinderCLI.console.status("[bold cyan]Analyzing reading history..."):
                 session.reader_profile = await analyze_reader(rated_str, to_read_str, model)
-            # Cache the initial analysis so we don't have to re-run this expensive step
+            # cache the initial analysis so we don't have to re-run this expensive step
             dm.save("search_session.json", session)
         
         # Generate/Ask questions
-        # We regenerate questions if we don't have responses yet for this round
+        # we regenerate questions if we don't have responses yet for this round
         if not session.user_responses:
-            with BookfinderCLI.console.status("[bold cyan]Determining follow-up questions..."):
-                session.questions_plan = await preference_determination(
-                    session.reader_profile, 
-                    rated_str, 
-                    to_read_str, 
-                    model, 
-                    previous_analysis=session.refined_profile
-                )
+            if not session.questions_plan:
+                with BookfinderCLI.console.status("[bold cyan]Determining follow-up questions..."):
+                    session.questions_plan = await preference_determination(
+                        session.reader_profile, 
+                        rated_str, 
+                        to_read_str, 
+                        model, 
+                        previous_analysis=session.refined_profile
+                    )
+                dm.save("search_session.json", session)
+
+            # ask user
             session.user_responses = BookfinderCLI.ask_questions(session.questions_plan)
+            # save answers immediately so user doesn't have to re-answer if next step fails
+            dm.save("search_session.json", session)
         
         # Refine profile
         with BookfinderCLI.console.status("[bold cyan]Refining reader analysis..."):
@@ -130,11 +136,12 @@ async def main():
         BookfinderCLI.display_refinement(session.refined_profile)
         
         if not session.refined_profile.is_complete:
-            # Clear for next round - do NOT save here
+            # clear for next round and save intermediate progress
             session.questions_plan = None
             session.user_responses = None
+            dm.save("search_session.json", session)
         else:
-            # Refinement is complete, save the final analysis state
+            # refinement is complete, save the final analysis state
             dm.save("search_session.json", session)
 
     # step 6. search until we have a number of solid reccomendations
@@ -142,9 +149,8 @@ async def main():
         if not session.wide_net_plan:
             with BookfinderCLI.console.status("[bold cyan]Generating wide net search plan..."):
                 session.wide_net_plan = await wide_net_selection(session.refined_profile, to_read_str, rated_str, get_model())
-            dm.save("search_session.json", session)
 
-        await run_search_workflow(session.wide_net_plan, service, session, dm)
+        await run_search_workflow(session.wide_net_plan, service, session)
 
         while True:
             # aggregate all books for interpretation
@@ -154,7 +160,6 @@ async def main():
             
             with BookfinderCLI.console.status("[bold cyan]Interpreting search results..."):
                 session.final_recommendations = await interpret_search_results(session.refined_profile, all_searched, session.feedback_history, get_model())
-            dm.save("search_session.json", session)
 
             BookfinderCLI.display_final_report(session, service)
             
@@ -172,7 +177,7 @@ async def main():
                 with BookfinderCLI.console.status("[bold cyan]Expanding search with new criteria..."):
                     new_exp = await targeted_expansion_selection(session.refined_profile, all_searched, rated_str, session.feedback_history, get_model())
                 session.expansion_plans.append(new_exp)
-                await run_search_workflow(new_exp, service, session, dm)
+                await run_search_workflow(new_exp, service, session)
 
 
 if __name__ == "__main__":
