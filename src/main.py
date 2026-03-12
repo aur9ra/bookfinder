@@ -18,7 +18,8 @@ from models import (
     TargetedExpansionPlan,
     InterpretationResult,
     SearchSession,
-    UserFeedback
+    UserFeedback,
+    Book
 )
 from strands.models.gemini import GeminiModel
 from data_manager import DataManager

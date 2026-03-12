@@ -2,7 +2,7 @@ import csv
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
-class Book(BaseModel):
+class GoodreadsBook(BaseModel):
     book_id: int = Field(alias="Book Id")
     title: str = Field(alias="Title")
     author: str = Field(alias="Author")
@@ -40,10 +40,10 @@ class Book(BaseModel):
         except ValueError:
             return None
 
-def load_books(path: str) -> List[Book]:
+def load_books(path: str) -> List[GoodreadsBook]:
     books = []
     with open(path, mode="r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            books.append(Book(**row))
+            books.append(GoodreadsBook(**row))
     return books

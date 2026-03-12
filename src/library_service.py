@@ -1,5 +1,5 @@
 from typing import List, Dict
-from models import BookToSearch, RawSearchResult, SearchResultSet, AvailabilityStatus
+from models import Book, RawSearchResult, SearchResultSet, AvailabilityStatus
 from api import search_sfpl, get_detailed_availability
 
 class LibraryService:
@@ -7,7 +7,7 @@ class LibraryService:
         self.locations = locations
         self.branch_lookup = branch_lookup
 
-    async def search_book(self, book: BookToSearch, status_callback=None) -> bool:
+    async def search_book(self, book: Book, status_callback=None) -> bool:
         """
         Performs a location-first, then wide-net search for a book.
         Updates the book object in-place. Returns True if results were found.
@@ -48,6 +48,13 @@ class LibraryService:
                     else:
                         r.availability = AvailabilityStatus.NOT_AVAILABLE
                 
+                # set book-level availability based on best available result
+                book.availability = AvailabilityStatus.NOT_AVAILABLE
+                for status in [AvailabilityStatus.AVAILABLE_LOCAL, AvailabilityStatus.AVAILABLE_SYSTEM, AvailabilityStatus.ON_HOLD]:
+                    if any(r.availability == status for r in result_set.results):
+                        book.availability = status
+                        break
+
                 book.results = result_set.results
                 book.searched = True
                 return True

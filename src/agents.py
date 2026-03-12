@@ -5,7 +5,7 @@ from strands.agent.agent import Agent
 from models import (
     ReaderAnalysis, RefinedReaderAnalysis, QuestionOption, PreferenceQuestion,
     PreferenceDeterminationPlan, UserAnswer, UserResponseSet, RawSearchResult,
-    FinalRecommendation, InterpretationResult, BookToSearch, BookSearchPlan,
+    FinalRecommendation, InterpretationResult, Book, BookSearchPlan,
     TargetedExpansionPlan, UserFeedback
 )
 
@@ -37,7 +37,7 @@ async def wide_net_selection(analysis: RefinedReaderAnalysis, to_read: str, rate
     
     return selection_result.structured_output
 
-async def targeted_expansion_selection(analysis: RefinedReaderAnalysis, previous_searches: List[BookToSearch], rated: str, feedback_history: List[UserFeedback], model) -> TargetedExpansionPlan:
+async def targeted_expansion_selection(analysis: RefinedReaderAnalysis, previous_searches: List[Book], rated: str, feedback_history: List[UserFeedback], model) -> TargetedExpansionPlan:
     # analyze all previous searches and generate 10 more targeted searches
     previous_titles = ", ".join([f"{b.title} by {b.author}" for b in previous_searches])
     

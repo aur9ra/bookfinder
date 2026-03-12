@@ -2,7 +2,7 @@ import difflib
 from typing import List, Dict, Callable, Any, Coroutine
 from models import (
     PreferenceDeterminationPlan, UserResponseSet, UserAnswer, SearchSession, 
-    BookToSearch, RefinedReaderAnalysis, UserFeedback, AvailabilityStatus
+    Book, RefinedReaderAnalysis, UserFeedback, AvailabilityStatus
 )
 from library_service import LibraryService
 from rich.console import Console
@@ -145,8 +145,8 @@ class BookfinderCLI:
 
     @staticmethod
     async def run_search_with_progress(
-        books: List[BookToSearch], 
-        search_func: Callable[[BookToSearch, Any], Coroutine[Any, Any, bool]],
+        books: List[Book], 
+        search_func: Callable[[Book, Any], Coroutine[Any, Any, bool]],
         service: LibraryService,
         on_step_complete: Callable[[], None]
     ):

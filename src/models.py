@@ -62,50 +62,51 @@ class SearchResultSet(BaseModel):
     results: List[RawSearchResult] = Field(description="List of matched books")
     url: str = Field(description="The URL used to perform this search")
 
-class BookToSearch(BaseModel):
+class Book(BaseModel):
     search_id: str = Field(description="A unique, URL-friendly identifier (slug) for this book, e.g., 'hitchhikers-guide-to-the-galaxy'")
     title: str = Field(description="Title of the book")
     author: str = Field(description="Author of the book")
     source: Literal["to_read", "discovery"] = Field(description="Source of the book")
     primary_query: str = Field(description="Primary search string")
     fallback_queries: List[str] = Field(default_factory=list, description="Fallback queries")
+    availability: AvailabilityStatus = Field(default=AvailabilityStatus.NOT_AVAILABLE, description="Overall availability status")
     results: List[RawSearchResult] = Field(default_factory=list, description="Raw results found", exclude=True)
     search_url: Optional[str] = Field(default=None, description="Successful search URL", exclude=True)
     searched: bool = Field(default=False, description="Whether this book has been searched", exclude=True)
 
 class BookSearchPlan(BaseModel):
-    b1: BookToSearch
-    b2: BookToSearch
-    b3: BookToSearch
-    b4: BookToSearch
-    b5: BookToSearch
-    b6: BookToSearch
-    b7: BookToSearch
-    b8: BookToSearch
-    b9: BookToSearch
-    b10: BookToSearch
-    b11: BookToSearch
-    b12: BookToSearch
-    b13: BookToSearch
-    b14: BookToSearch
-    b15: BookToSearch
+    b1: Book
+    b2: Book
+    b3: Book
+    b4: Book
+    b5: Book
+    b6: Book
+    b7: Book
+    b8: Book
+    b9: Book
+    b10: Book
+    b11: Book
+    b12: Book
+    b13: Book
+    b14: Book
+    b15: Book
 
-    def get_books(self) -> List[BookToSearch]:
+    def get_books(self) -> List[Book]:
         return [getattr(self, f"b{i}") for i in range(1, 16)]
 
 class TargetedExpansionPlan(BaseModel):
-    b1: BookToSearch
-    b2: BookToSearch
-    b3: BookToSearch
-    b4: BookToSearch
-    b5: BookToSearch
-    b6: BookToSearch
-    b7: BookToSearch
-    b8: BookToSearch
-    b9: BookToSearch
-    b10: BookToSearch
+    b1: Book
+    b2: Book
+    b3: Book
+    b4: Book
+    b5: Book
+    b6: Book
+    b7: Book
+    b8: Book
+    b9: Book
+    b10: Book
 
-    def get_books(self) -> List[BookToSearch]:
+    def get_books(self) -> List[Book]:
         return [getattr(self, f"b{i}") for i in range(1, 11)]
 
 # --- final recommendation models ---
@@ -115,7 +116,7 @@ class UserFeedback(BaseModel):
     rejected_titles: List[str] = Field(default_factory=list, description="Titles the user specifically rejected in this turn")
 
 class FinalRecommendation(BaseModel):
-    search_id: str = Field(description="The search_id of the BookToSearch this recommendation is based on")
+    search_id: str = Field(description="The search_id of the Book this recommendation is based on")
     title: str
     author: str
     reasoning: str = Field(description="Why this book was chosen")
