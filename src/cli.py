@@ -1,8 +1,9 @@
 import difflib
+import urllib.parse
 from typing import List, Dict, Callable, Any, Coroutine
 from models import (
     PreferenceDeterminationPlan, UserResponseSet, UserAnswer, SearchSession, 
-    Book, RefinedReaderAnalysis, UserFeedback, AvailabilityStatus
+    Book, RefinedReaderAnalysis, UserFeedback, AvailabilityStatus, FinalRecommendation
 )
 from library_service import LibraryService
 from rich.console import Console
@@ -227,11 +228,66 @@ class BookfinderCLI:
             BookfinderCLI.console.print("    (No results found in search)", style=CLITheme.DIM)
 
     @staticmethod
+    def _display_recommendation_list(
+        recs: List[FinalRecommendation], 
+        search_map: Dict[str, Book], 
+        title_map: Dict[str, Book], 
+        service: LibraryService,
+        header: str,
+        header_style: str
+    ):
+        if not recs:
+            return
+
+        BookfinderCLI.console.print(f"\n[ {header} ]", style=header_style)
+        
+        def normalize(t):
+            return t.lower().strip() if t else ""
+
+        for i, rec in enumerate(recs, 1):
+            BookfinderCLI.console.print(f"\n  {i}. {rec.title} by {rec.author}", style=CLITheme.SUBHEADER)
+            
+            # 1. try id match first
+            source_match = search_map.get(rec.search_id)
+            
+            # 2. try normalized title match
+            if not source_match:
+                source_match = title_map.get(normalize(rec.title))
+            
+            # 3. fuzzy match fallback
+            if not source_match:
+                possible_titles = list(title_map.keys())
+                closest = difflib.get_close_matches(normalize(rec.title), possible_titles, n=1, cutoff=0.6)
+                if closest:
+                    source_match = title_map.get(closest[0])
+            
+            if source_match:
+                if source_match.search_url:
+                    BookfinderCLI.console.print(f"     [{CLITheme.DIM}]Search:[/] {source_match.search_url}")
+
+                norm_rec_title = normalize(rec.title)
+                # find the specific result in the book's search results
+                raw_hit = next((r for r in source_match.results if normalize(r.title) == norm_rec_title), None)
+                
+                if raw_hit:
+                    color = CLITheme.AVAIL_HOLD
+                    if raw_hit.availability == AvailabilityStatus.AVAILABLE_LOCAL:
+                        color = CLITheme.AVAIL_LOCAL
+                    elif raw_hit.availability == AvailabilityStatus.AVAILABLE_SYSTEM:
+                        color = CLITheme.AVAIL_SYSTEM
+                    
+                    BookfinderCLI.console.print(f"     [{CLITheme.DIM}]Status:[/] [{color}]{service.get_status_summary(raw_hit)}[/]")
+                elif source_match.results:
+                    top_res = source_match.results[0]
+                    BookfinderCLI.console.print(f"     [{CLITheme.DIM}]Status (Top Result):[/] {service.get_status_summary(top_res)}")
+            
+            BookfinderCLI.console.print(f"     [{CLITheme.DIM}]Why:[/] {rec.reasoning}")
+
+    @staticmethod
     def display_final_report(session: SearchSession, service: LibraryService):
         if not session.final_recommendations:
             return
 
-        from models import AvailabilityStatus
         BookfinderCLI.display_search_header("FINAL RECOMMENDATIONS")
         
         status = "COMPLETE" if session.final_recommendations.is_complete else "INCOMPLETE"
@@ -250,55 +306,18 @@ class BookfinderCLI:
             search_map = {b.search_id: b for b in all_searched if b.search_id}
             title_map = {normalize(b.title): b for b in all_searched}
 
-            for i, rec in enumerate(session.final_recommendations.recommendations, 1):
-                BookfinderCLI.console.print(f"\n{i}. {rec.title} by {rec.author}", style=CLITheme.SUBHEADER)
-                
-                # 1. try id match first
-                source_match = search_map.get(rec.search_id)
-                
-                # 2. try normalized title match
-                if not source_match:
-                    source_match = title_map.get(normalize(rec.title))
-                
-                # 3. fuzzy match fallback
-                if not source_match:
-                    possible_titles = list(title_map.keys())
-                    closest = difflib.get_close_matches(normalize(rec.title), possible_titles, n=1, cutoff=0.6)
-                    if closest:
-                        source_match = title_map.get(closest[0])
-                
-                found_status = False
-                
-                if source_match:
-                    if source_match.search_url:
-                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Search:[/] {source_match.search_url}")
+            # display local recommendations
+            BookfinderCLI._display_recommendation_list(
+                session.final_recommendations.local_recommendations,
+                search_map, title_map, service,
+                "[ AVAILABLE LOCALLY ]", CLITheme.SUCCESS
+            )
 
-                    norm_rec_title = normalize(rec.title)
-                    # find the specific result in the book's search results
-                    raw_hit = next((r for r in source_match.results if normalize(r.title) == norm_rec_title), None)
-                    
-                    if raw_hit:
-                        color = CLITheme.AVAIL_HOLD
-                        if raw_hit.availability == AvailabilityStatus.AVAILABLE_LOCAL:
-                            color = CLITheme.AVAIL_LOCAL
-                        elif raw_hit.availability == AvailabilityStatus.AVAILABLE_SYSTEM:
-                            color = CLITheme.AVAIL_SYSTEM
-                        
-                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status:[/] [{color}]{service.get_status_summary(raw_hit)}[/]")
-                        found_status = True
-                    elif source_match.results:
-                        top_res = source_match.results[0]
-                        BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status (Top Result):[/] {service.get_status_summary(top_res)}")
-                        found_status = True
-                
-                if not found_status:
-                    # final fallback: manual search link if we couldn't link it to a previous search
-                    import urllib.parse
-                    query = urllib.parse.quote(f"{rec.title} {rec.author}")
-                    manual_link = f"https://sfpl.bibliocommons.com/v2/search?query={query}&searchType=smart"
-                    BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Manual Search:[/] {manual_link}")
-                    BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Status:[/] Availability Unknown (Link Mismatch)")
-                
-                BookfinderCLI.console.print(f"   [{CLITheme.DIM}]Why:[/] {rec.reasoning}")
+            # display system recommendations
+            BookfinderCLI._display_recommendation_list(
+                session.final_recommendations.system_recommendations,
+                search_map, title_map, service,
+                "[ AVAILABLE ELSEWHERE OR ON HOLD ]", CLITheme.ACCENT
+            )
         else:
             BookfinderCLI.console.print("\nCould not find sufficient high-confidence matches.", style=CLITheme.ERROR)
