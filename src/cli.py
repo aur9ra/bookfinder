@@ -215,7 +215,7 @@ class BookfinderCLI:
                 live.update(generate_table())
 
     @staticmethod
-    def display_book_results(book: BookToSearch, service: LibraryService):
+    def display_book_results(book: Book, service: LibraryService):
         BookfinderCLI.console.print(f"\n--- Searching for: {book.title} by {book.author} ({book.source}) ---", style=CLITheme.SUBHEADER)
         
         if book.results:

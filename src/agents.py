@@ -57,7 +57,7 @@ async def targeted_expansion_selection(analysis: RefinedReaderAnalysis, previous
     
     return expansion_result.structured_output
 
-async def interpret_search_results(analysis: RefinedReaderAnalysis, all_searched_books: List[BookToSearch], feedback_history: List[UserFeedback], model) -> InterpretationResult:
+async def interpret_search_results(analysis: RefinedReaderAnalysis, all_searched_books: List[Book], feedback_history: List[UserFeedback], model) -> InterpretationResult:
     # interpret the raw results
     interpretation_agent = Agent(
         model=model,
