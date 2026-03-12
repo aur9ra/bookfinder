@@ -120,9 +120,16 @@ class FinalRecommendation(BaseModel):
     author: str
     reasoning: str = Field(description="Why this book was chosen")
 
+class LocalRecommendation(FinalRecommendation):
+    availability: Literal[AvailabilityStatus.AVAILABLE_LOCAL] = Field(description="Must be AVAILABLE_LOCAL")
+
+class SystemRecommendation(FinalRecommendation):
+    availability: Literal[AvailabilityStatus.AVAILABLE_SYSTEM, AvailabilityStatus.ON_HOLD] = Field(description="Must be AVAILABLE_SYSTEM or ON_HOLD")
+
 class InterpretationResult(BaseModel):
-    is_complete: bool = Field(description="True if 5 recommendations found")
-    recommendations: List[FinalRecommendation] = Field(default_factory=list, description="Top 5 matches")
+    is_complete: bool = Field(description="True if sufficient recommendations found (usually 5 total)")
+    local_recommendations: List[LocalRecommendation] = Field(default_factory=list, description="Books available at user's local branches (at least 2 preferred)")
+    system_recommendations: List[SystemRecommendation] = Field(default_factory=list, description="Books available elsewhere in the system or on hold")
     reasoning: str = Field(description="Overall interpretation logic")
 
 # --- orchestration / session models ---
