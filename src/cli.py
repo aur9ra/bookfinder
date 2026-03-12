@@ -65,7 +65,7 @@ class BookfinderCLI:
         BookfinderCLI.console.print("Please answer the following questions to help refine your profile.\n", style=CLITheme.DIM)
 
         for i, question in enumerate(plan.questions, 1):
-            BookfinderCLI.console.print(f"Question {i}: {question.text}", style=CLITheme.SUBHEADER)
+            BookfinderCLI.console.print(f"Question {i}/{len(plan.questions)}: {question.text}", style=CLITheme.SUBHEADER)
             
             # display response options
             for j, option in enumerate(question.options, 1):
